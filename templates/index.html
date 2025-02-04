@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Next Word Prediction</title>
+    <style>
+        /* General styles */
+        body {
+            font-family: Arial, sans-serif;
+            background: linear-gradient(135deg, #4facfe, #00f2fe);
+            color: #333;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+
+        h1 {
+            font-size: 28px; /* Slightly larger title */
+            color: #080000;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 800px; /* Increased max width for larger container */
+            background: #ffffff;
+            border-radius: 12px;
+            padding: 40px; /* Increased padding */
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
+            text-align: center;
+        }
+
+        label {
+            font-size: 20px;
+            font-weight: 600;
+            color: #555;
+            display: block;
+            margin-bottom: 15px;
+        }
+
+        input[type="text"] {
+            font-size: 20px;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            margin-bottom: 30px;
+            width: 100%;
+            box-sizing: border-box;
+            transition: border-color 0.3s, box-shadow 0.3s;
+        }
+
+        input[type="text"]:focus {
+            border-color: #4facfe;
+            box-shadow: 0 0 5px rgba(79, 172, 254, 0.5);
+            outline: none;
+        }
+
+        button {
+            font-size: 20px;
+            font-weight: 600;
+            color: #ffffff;
+            background: linear-gradient(135deg, #4facfe, #00f2fe);
+            padding: 14px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background 0.3s, transform 0.2s;
+            width: 100%;
+        }
+
+        button:hover {
+            background: linear-gradient(135deg, #00f2fe, #4facfe);
+            transform: scale(1.02);
+        }
+
+        #result {
+            margin-top: 30px;
+            text-align: left;
+            animation: fadeIn 0.5s ease-in-out;
+        }
+
+        .prediction-item {
+            font-size: 20px;
+            padding: 15px;
+            border-bottom: 1px solid #eee;
+        }
+
+        .prediction-item:last-child {
+            border-bottom: none;
+        }
+
+        .prediction-item span {
+            font-weight: bold;
+            color: #4facfe;
+        }
+
+        .append-btn {
+            margin-top: 5px;
+            font-size: 18px;
+            padding: 8px 12px;
+            border: none;
+            border-radius: 6px;
+            background: #4facfe;
+            color: #fff;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        .append-btn:hover {
+            background: #00f2fe;
+        }
+
+        @media (max-width: 480px) {
+            .container {
+                padding: 20px;
+                max-width: 100%; /* For small devices */
+            }
+
+            h1 {
+                font-size: 22px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Next Word Prediction</h1>
+        <form method="POST" action="/predict" onsubmit="return showPredictions(event);">
+            <label for="text">Enter your text:</label>
+            <input type="text" id="text" name="text" required>
+            <button type="submit">Predict</button>
+        </form>
+        <div id="result">
+            <!-- Predictions will be displayed here -->
+        </div>
+    </div>
+
+    <script>
+        // Function to fetch predictions from Flask backend
+        async function fetchPredictions(inputText) {
+            const response = await fetch('/predict', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: new URLSearchParams({
+                    text: inputText,
+                }),
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to fetch predictions. Please try again.');
+            }
+
+            const data = await response.json();
+            if (data.error) {
+                throw new Error(data.error);
+            }
+
+            return data.predictions;
+        }
+
+        // Append the selected word to the input box and refresh predictions
+        async function appendWord(word) {
+            const inputBox = document.getElementById("text");
+            inputBox.value += " " + word;
+
+            // Refresh predictions after appending
+            await showPredictions(new Event("submit"));
+        }
+
+        // Show predictions dynamically
+        async function showPredictions(event) {
+            event.preventDefault(); // Prevent form submission
+            const inputText = document.getElementById("text").value;
+
+            if (!inputText.trim()) {
+                alert("Please enter some text.");
+                return;
+            }
+
+            const resultDiv = document.getElementById("result");
+            resultDiv.innerHTML = "Loading predictions..."; // Display a loading message
+            resultDiv.style.display = "block";
+
+            try {
+                // Fetch predictions from the backend
+                const predictions = await fetchPredictions(inputText);
+
+                // Sort predictions in descending order of probability
+                predictions.sort((a, b) => b.probability - a.probability);
+
+                // Update the result div with sorted predictions and append buttons
+                resultDiv.innerHTML = predictions
+                    .map((prediction) => `
+                        <div class="prediction-item">
+                            Word: <span>${prediction.word}</span> 
+                            (Probability: ${(prediction.probability * 100).toFixed(2)}%)
+                            <button class="append-btn" onclick="appendWord('${prediction.word}')">Append</button>
+                        </div>
+                    `)
+                    .join("");
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="prediction-item">Error: ${error.message}</div>`;
+            }
+        }
+    </script>
+</body>
+</html>
